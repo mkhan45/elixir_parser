@@ -1,21 +1,7 @@
 # ElixirParse
 
-**TODO: Add description**
+An expression parser and evaluator made to learn Elixir
 
-## Installation
-
-If [available in Hex](https://hex.pm/docs/publish), the package can be installed
-by adding `elixir_parse` to your list of dependencies in `mix.exs`:
-
-```elixir
-def deps do
-  [
-    {:elixir_parse, "~> 0.1.0"}
-  ]
-end
+```sh
+mix run bin/calc.exs <expr>
 ```
-
-Documentation can be generated with [ExDoc](https://github.com/elixir-lang/ex_doc)
-and published on [HexDocs](https://hexdocs.pm). Once published, the docs can
-be found at [https://hexdocs.pm/elixir_parse](https://hexdocs.pm/elixir_parse).
-
