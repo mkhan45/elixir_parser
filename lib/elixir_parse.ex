@@ -13,6 +13,9 @@ defmodule Scanner do
 
       iex> Scanner.scan("1 + abc")
       [{:number, 1}, :add, {:ident, "abc"}]
+
+      iex> Scanner.scan("(1 + 3)")
+      [:lparen, {:number, 1}, :add, {:number, 3}, :rparen]
   """
   @spec scan({:number, String.t}) :: [{:number, number}]
   def scan({:number, inp}) do
@@ -38,6 +41,8 @@ defmodule Scanner do
       {"-", xs} -> [:sub] ++ scan(xs)
       {"*", xs} -> [:mul] ++ scan(xs)
       {"/", xs} -> [:div] ++ scan(xs)
+      {"(", xs} -> [:lparen] ++ scan(xs)
+      {")", xs} -> [:rparen] ++ scan(xs)
       {x, _} when "0" <= x and x <= "9" -> scan({:number, inp})
       {x, _} when "a" <= x and x <= "z" -> scan({:ident, inp})
     end
@@ -77,15 +82,83 @@ defmodule Expr do
 end
 
 defmodule Parser do
+  @spec op_bp(atom) :: {integer, integer}
+  def op_bp(op) do
+    case op do
+      op when op in [:add, :sub] -> {4, 5}
+      op when op in [:mul, :div] -> {6, 7}
+    end
+  end
+
+  defmacro is_op(a) do
+    quote do: unquote(a) in [:add, :sub, :mul, :div]
+  end
+
+  defp complete_expr(lhs, [], _min_bp) do
+    {lhs, []}
+  end
+
+  @spec complete_expr(Expr.t, [Scanner.token], integer) :: {Expr.t, [Scanner.token]}
+  defp complete_expr(lhs, ls, _min_bp) when not (ls |> hd |> is_op) do
+    {lhs, ls}
+  end
+
+  defp complete_expr(lhs, ls, min_bp) do
+    {l_bp, r_bp} = ls |> hd |> op_bp
+
+    if l_bp < min_bp do
+      {lhs, ls}
+    else
+      [op | xs] = ls
+      {rhs, rem} = expr_bp(xs, r_bp)
+      complete = %Expr.BinaryExpr{op: op, lhs: lhs, rhs: rhs}
+      complete_expr(complete, rem, min_bp)
+    end
+  end
+
+  @spec expr_bp([Scanner.token], integer) :: {Expr.t, [Scanner.token]}
+  def expr_bp([nx | xs], min_bp) do
+    {lhs, rest} = case nx do
+      :lparen -> 
+        {paren_expr, temp} = expr_bp(xs, 0)
+        if temp == [] or (hd(temp)) != :rparen do
+          throw "Mismatched parentheses"
+        end
+        {paren_expr, tl(temp)}
+      {:number, n} -> {n, xs}
+    end
+
+    complete_expr(lhs, rest, min_bp)
+  end
+
+  @doc """
+      iex> Parser.parse "5"
+      5
+
+      iex> Parser.parse "5 + 2"
+      %Expr.BinaryExpr{op: :add, lhs: 5, rhs: 2}
+
+      iex> Parser.parse "5 + 2 * 3"
+      %Expr.BinaryExpr{op: :add, lhs: 5, rhs: %Expr.BinaryExpr{op: :mul, lhs: 2, rhs: 3}}
+
+      iex> Parser.parse "10 / 2 + 5 * 3"
+      %Expr.BinaryExpr{op: :add, lhs: %Expr.BinaryExpr{op: :div, lhs: 10, rhs: 2}, rhs: %Expr.BinaryExpr{op: :mul, lhs: 5, rhs: 3}}
+
+      iex> Parser.parse "10 / (2 + 5) * 3"
+      %Expr.BinaryExpr{op: :mul, lhs: %Expr.BinaryExpr{lhs: 10, op: :div, rhs: %Expr.BinaryExpr{lhs: 2, op: :add, rhs: 5}}, rhs: 3}
+  """
+  @spec parse(String.t) :: Expr.t
+  def parse(s) do
+    tokens = Scanner.scan(s)
+    {res, _} = expr_bp(tokens, 0)
+    res
+  end
 end
 
 defmodule Main do
   use Application
-  alias Expr.BinaryExpr, as: BinaryExpr
 
   def start(_type, _args) do
-    # IO.inspect ("5 + 3 + 2 - 17 * 3" |> Scanner.scan)
-    IO.inspect (%BinaryExpr{op: :add, lhs: 2, rhs: %BinaryExpr{op: :mul, lhs: 3, rhs: 4}} |> Expr.eval)
     Supervisor.start_link([], strategy: :one_for_one)
   end
 end
