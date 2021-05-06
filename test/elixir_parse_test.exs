@@ -4,22 +4,22 @@ defmodule ElixirParseTest do
   doctest Parser
 
   test "atom" do
-    assert "5" |> Parser.parse |> Expr.eval == 5
+    assert "5" |> Parser.parse() |> Expr.eval() == 5
   end
 
   test "two_term" do
-    assert "5 + 3" |> Parser.parse |> Expr.eval == 8
+    assert "5 + 3" |> Parser.parse() |> Expr.eval() == 8
   end
 
   test "three_term" do
-    assert "5 + 3 * 2" |> Parser.parse |> Expr.eval == 11
+    assert "5 + 3 * 2" |> Parser.parse() |> Expr.eval() == 11
   end
 
   test "four_term" do
-    assert "5 / 2 + 3 * 2" |> Parser.parse |> Expr.eval == 8.5
+    assert "5 / 2 + 3 * 2" |> Parser.parse() |> Expr.eval() == 8.5
   end
 
   test "parens" do
-    assert "5 / (2 + 3) * 2" |> Parser.parse |> Expr.eval == 2
+    assert "5 / (2 + 3) * 2" |> Parser.parse() |> Expr.eval() == 2
   end
 end

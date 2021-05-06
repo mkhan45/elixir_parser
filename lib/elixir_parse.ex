@@ -1,6 +1,6 @@
 defmodule Scanner do
-  @type token :: atom | {:number, number} | {:ident, String.t}
-  
+  @type token :: atom | {:number, number} | {:ident, String.t()}
+
   @doc """
       iex> Scanner.scan({:number, "35"})
       [{:number, 35}]
@@ -17,13 +17,13 @@ defmodule Scanner do
       iex> Scanner.scan("(1 + 3)")
       [:lparen, {:number, 1}, :add, {:number, 3}, :rparen]
   """
-  @spec scan({:number, String.t}) :: [{:number, number}]
+  @spec scan({:number, String.t()}) :: [{:number, number}]
   def scan({:number, inp}) do
     {x, xs} = Integer.parse(inp)
     [{:number, x}] ++ scan(xs)
   end
 
-  @spec scan({:ident, String.t}) :: [{:ident, String.t}]
+  @spec scan({:ident, String.t()}) :: [{:ident, String.t()}]
   def scan({:ident, inp}) do
     case String.split(inp, " ", parts: 2) do
       [lex] -> [{:ident, lex}]
@@ -31,9 +31,9 @@ defmodule Scanner do
     end
   end
 
-  @spec scan(String.t) :: [token]
+  @spec scan(String.t()) :: [token]
   def scan(inp) do
-    case String.next_grapheme inp do
+    case String.next_grapheme(inp) do
       nil -> []
       {" ", xs} -> scan(xs)
       {"\t", xs} -> scan(xs)
@@ -52,7 +52,7 @@ end
 defmodule Expr do
   defmodule BinaryExpr do
     defstruct [:op, :lhs, :rhs]
-    @type t :: %BinaryExpr {op: atom, lhs: Expr.t, rhs: Expr.t}
+    @type t :: %BinaryExpr{op: atom, lhs: Expr.t(), rhs: Expr.t()}
   end
 
   @doc """
@@ -62,7 +62,7 @@ defmodule Expr do
       iex> Expr.eval(%BinaryExpr{op: :mul, lhs: 5, rhs: %BinaryExpr{op: sub, lhs: 10, rhs: 2}})
       40
   """
-  @spec eval(BinaryExpr.t) :: number
+  @spec eval(BinaryExpr.t()) :: number
   def eval(%BinaryExpr{} = expr) do
     case expr.op do
       :add -> eval(expr.lhs) + eval(expr.rhs)
@@ -78,7 +78,7 @@ defmodule Expr do
   end
 
   @type atomic :: number
-  @type t :: atomic | BinaryExpr.t
+  @type t :: atomic | BinaryExpr.t()
 end
 
 defmodule Parser do
@@ -98,35 +98,39 @@ defmodule Parser do
     {lhs, []}
   end
 
-  @spec complete_expr(Expr.t, [Scanner.token], integer) :: {Expr.t, [Scanner.token]}
-  defp complete_expr(lhs, ls, _min_bp) when not (ls |> hd |> is_op) do
+  @spec complete_expr(Expr.t(), [Scanner.token()], integer) :: {Expr.t(), [Scanner.token()]}
+  defp complete_expr(lhs, [nx | _] = ls, _min_bp) when not is_op(nx) do
     {lhs, ls}
   end
 
-  defp complete_expr(lhs, ls, min_bp) do
-    {l_bp, r_bp} = ls |> hd |> op_bp
+  defp complete_expr(lhs, [nx | xs] = ls, min_bp) do
+    {l_bp, r_bp} = op_bp(nx)
 
     if l_bp < min_bp do
       {lhs, ls}
     else
-      [op | xs] = ls
       {rhs, rem} = expr_bp(xs, r_bp)
-      complete = %Expr.BinaryExpr{op: op, lhs: lhs, rhs: rhs}
+      complete = %Expr.BinaryExpr{op: nx, lhs: lhs, rhs: rhs}
       complete_expr(complete, rem, min_bp)
     end
   end
 
-  @spec expr_bp([Scanner.token], integer) :: {Expr.t, [Scanner.token]}
+  @spec expr_bp([Scanner.token()], integer) :: {Expr.t(), [Scanner.token()]}
   def expr_bp([nx | xs], min_bp) do
-    {lhs, rest} = case nx do
-      :lparen -> 
-        {paren_expr, temp} = expr_bp(xs, 0)
-        if temp == [] or (hd(temp)) != :rparen do
-          throw "Mismatched parentheses"
-        end
-        {paren_expr, tl(temp)}
-      {:number, n} -> {n, xs}
-    end
+    {lhs, rest} =
+      case nx do
+        :lparen ->
+          {paren_expr, temp} = expr_bp(xs, 0)
+
+          if temp == [] or hd(temp) != :rparen do
+            throw("Mismatched parentheses")
+          end
+
+          {paren_expr, tl(temp)}
+
+        {:number, n} ->
+          {n, xs}
+      end
 
     complete_expr(lhs, rest, min_bp)
   end
@@ -147,7 +151,7 @@ defmodule Parser do
       iex> Parser.parse "10 / (2 + 5) * 3"
       %Expr.BinaryExpr{op: :mul, lhs: %Expr.BinaryExpr{lhs: 10, op: :div, rhs: %Expr.BinaryExpr{lhs: 2, op: :add, rhs: 5}}, rhs: 3}
   """
-  @spec parse(String.t) :: Expr.t
+  @spec parse(String.t()) :: Expr.t()
   def parse(s) do
     tokens = Scanner.scan(s)
     {res, _} = expr_bp(tokens, 0)
@@ -156,9 +160,7 @@ defmodule Parser do
 end
 
 defmodule Main do
-  use Application
-
-  def start(_type, _args) do
-    Supervisor.start_link([], strategy: :one_for_one)
+  def main(args) do
+    args |> Enum.join(" ") |> Parser.parse() |> Expr.eval() |> IO.puts()
   end
 end
